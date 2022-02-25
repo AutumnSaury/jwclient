@@ -1,0 +1,8 @@
+
+config userinfo 'userinfo'
+    option enable '0'
+    option ifname ''
+    option username ''
+    option password ''
+
+config storedconf 'storedconf'

@@ -1,0 +1,129 @@
+#!/bin/sh /etc/rc.common
+START=100
+
+TMP=$(mktemp -d)
+trap 'rm -rf $TMPFILE' EXIT
+
+start() {
+    config_load jwclient
+
+    local enable
+    config_get enable userinfo enable
+    if [ ! $enable ]; then
+        echo "Not enabled."
+        exit 1
+    fi
+
+    local ifname
+    local username
+    local pwd
+    local ssid
+    local wlanacname
+    local url
+    local nasip
+    local wlanuserip
+    local firstrun
+    config_get ifname userinfo ifname
+    config_get username userinfo username
+    config_get pwd userinfo pwd
+    local redir=$(curl -s --interface $ifname www.baidu.com | grep -Po "http.+(?=</script>)" | sed "s/login/loginForWeb/")
+    
+    config_get firstrun storedconf firstrun
+    if [ ! $firstrun ]; then
+        local cookie1=$(curl -s -I --interface $ifname $redir | grep -Po "(?<=Set-Cookie: ).+")
+        local jsessionid=$(echo $cookie1 | grep -Po "(?<=JSESSIONID=)[0-9A-F]{32}")
+        local server_path=$(echo $cookie1 | grep -Po "(?<=Path=).+(?=;)")
+        uci set jwclient.storedconf.server_path=$server_path
+        uci set jwclient.storedconf.jsessionid=$jsessionid
+    else
+        local jsessionid
+        local server_path
+        config_get jsessionid storedconf jsessionid
+        config_get server_path storedconf server_path
+    fi
+    local server_domain=$(echo $redir | grep -Po "https?:\/\/[^\/]+")
+    uci set jwclient.storedconf.server_domain=$server_domain
+    
+    $(echo $redir |\
+    grep -Po "(?<=\?|&)([^=]+)=([^\?&']*)" |\
+        while read pair; do
+            uci set jwclient.storedconf.$pair
+        done
+    )
+    uci commit jwclient
+
+    config_get ssid storedconf ssid
+    config_get wlanacname storedconf wlanacname
+    config_get url storedconf url
+    config_get nasip storedconf nasip
+    config_get wlanuserip storedconf wlanuserip
+    
+    curl -s -i --interface $ifname -X POST ${server_domain}${server_path}login/do \
+        -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8" \
+        --data "qrCodeId=%E8%AF%B7%E8%BE%93%E5%85%A5%E7%BC%96%E5%8F%B7&username=${username}&pwd=${pwd}&validCode=%E9%AA%8C%E8%AF%81%E7%A0%81&validCodeFlag=false&ssid=${ssid}&mac=${mac}&t=${t}&wlanacname=${wlanacname}&url=${url}&nasip=${nasip}&wlanuserip=${wlanuserip}" \
+        > $TMP/login_result
+
+    local status=$(cat $TMP/login_result | tail -n 1 | grep -Po '(?<=result":").+(?=")')
+    if [ "$status" == "success" ]; then
+        echo "Joywise campus network connected successufully."
+        local cookie2=$(cat $TMP/login_result | grep "userIndex")
+        local userindex=$(echo $cookie2 | grep -Po "(?<=userIndex=\").+(?=\"; Ver)")
+        local deviceip=$(echo $userindex | awk -F, '{print $1}')
+        local userip=$(echo $userindex | awk -F, '{print $2}')
+
+        uci set jwclient.storedconf.userindex=$userindex
+        uci set jwclient.storedconf.deviceip=$deviceip
+        uci set jwclient.storedconf.userip=$userip
+        uci set jwclient.storedconf.firstrun=0
+        uci commit jwclient
+        exit 0
+    else
+        echo "Connect attempt failed, check your settings and try again."
+        local message=$(cat $TMP/login_result | tail -n 1 | grep -Po '(?<=message":").+(?=","n)')
+        echo "Failure message: $message"
+        exit 1
+    fi
+}
+
+stop() {
+    config_load jwclient
+
+    local firstrun
+    config_get firstrun storedconf firstrun
+    if [ ! $firstrun ]; then
+        echo "Connect for once before disconnecting."
+        exit 1
+    fi
+
+    local ifname
+    local server_domain
+    local server_path
+    local username
+    local userip
+    local deviceip
+
+    config_get username userinfo username
+    config_get userip storedconf userip
+    config_get deviceip storedconf deviceip
+    config_get ifname userinfo ifname
+    config_get server_domain storedconf server_domain
+    config_get server_path storedconf server_path
+    local usermac=$(ip link show dev $ifname | tail -n 1 | grep -Po "(?<= )(?:[0-9a-f]{2}:){5}[0-9a-f]{2}(?= )" | sed "s/://g")
+    curl -s -i --interface $ifname -X POST ${server_domain}${server_path}logout \
+        -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8" \
+        --data "userName=${username}&userIp=${userip}&deviceIp=${deviceip}&service.id=&autoLoginFlag=false&userMac=${usermac}&operationType=&isMacFastAuth=false" > $TMP/logout_result
+    local result=$(cat $TMP/logout_result | grep "已下线")
+    if [ -z "$result" ]; then
+        echo "Disconnect attempt failed, check your settings and try again."
+        exit 1
+    else
+        echo "Successfully disconnected."
+        uci commit jwclient
+        exit 0
+    fi
+}
+
+restart() {
+    stop
+    start
+}
