@@ -4,11 +4,27 @@ TMP=$(mktemp)
 trap 'rm -f $TMP' EXIT
 config_load jwclient
 
+is_connected() {
+    local ifname
+    config_get ifname userinfo ifname
+    local online=$(curl -s --interface $ifname www.baidu.com | grep "!DOCTYPE html")
+    if [ -n "$online" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 start() {
     local enable
     config_get enable userinfo enable
     if [ ! $enable ]; then
         echo "Not enabled."
+        exit 1
+    fi
+
+    if is_connected; then
+        echo "Already connected."
         exit 1
     fi
 
@@ -19,12 +35,6 @@ start() {
     config_get ifname userinfo ifname
     config_get username userinfo username
     config_get pwd userinfo pwd
-
-    local online=$(curl -s --interface $ifname www.baidu.com | grep "!DOCTYPE html")
-    if [ -n "$online" ]; then
-        echo "Already connected."
-        exit 1
-    fi
 
     local redir=$(curl -s --interface $ifname www.baidu.com | grep -Po "http.+(?=</script>)" | sed "s/login/loginForWeb/")
     local cookie1=$(curl -s -I --interface $ifname $redir | grep -Po "(?<=Set-Cookie: ).+")
@@ -70,6 +80,11 @@ stop() {
         exit 1
     fi
 
+    if [ ! is_connected ]; then
+        echo "Not connected."
+        exit 1
+    fi
+
     local ifname
     local server_domain
     local server_path
@@ -85,16 +100,15 @@ stop() {
     config_get server_path storedconf server_path
     local usermac=$(ip link show dev $ifname | tail -n 1 | grep -Po "(?<= )(?:[0-9a-f]{2}:){5}[0-9a-f]{2}(?= )" | sed "s/://g")
 
-    curl -s -i --interface $ifname -X POST ${server_domain}/${server_path}/logout \
+    local result=$(curl -s -i --interface $ifname -X POST ${server_domain}/${server_path}/logout \
         -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8" \
-        --data "userName=${username}&userIp=${userip}&deviceIp=${deviceip}&service.id=&autoLoginFlag=false&userMac=${usermac}&operationType=&isMacFastAuth=false" > $TMP
-    local result=$(cat $TMP | grep "已下线")
+        --data "userName=${username}&userIp=${userip}&deviceIp=${deviceip}&service.id=&autoLoginFlag=false&userMac=${usermac}&operationType=&isMacFastAuth=false" \
+        | tee - | grep "已下线")
     if [ -z "$result" ]; then
         echo "Disconnect attempt failed, check your settings and try again."
         exit 1
     else
         echo "Successfully disconnected."
-        uci commit jwclient
         exit 0
     fi
 }
