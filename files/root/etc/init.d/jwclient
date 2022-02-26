@@ -31,7 +31,6 @@ start() {
     local ifname
     local username
     local pwd
-    local firstrun
     config_get ifname userinfo ifname
     config_get username userinfo username
     config_get pwd userinfo pwd
@@ -103,7 +102,7 @@ stop() {
     local result=$(curl -s -i --interface $ifname -X POST ${server_domain}/${server_path}/logout \
         -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8" \
         --data "userName=${username}&userIp=${userip}&deviceIp=${deviceip}&service.id=&autoLoginFlag=false&userMac=${usermac}&operationType=&isMacFastAuth=false" \
-        | tee - | grep "已下线")
+        | grep "已下线")
     if [ -z "$result" ]; then
         echo "Disconnect attempt failed, check your settings and try again."
         exit 1
