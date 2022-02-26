@@ -20,8 +20,8 @@ start() {
     config_get username userinfo username
     config_get pwd userinfo pwd
 
-    local online=$(curl -s --interface $ifname www.baidu.com | grep "百度一下")
-    if [ -n $online ]; then
+    local online=$(curl -s --interface $ifname www.baidu.com | grep "!DOCTYPE html")
+    if [ -n "$online" ]; then
         echo "Already connected."
         exit 1
     fi
