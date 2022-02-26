@@ -4,7 +4,7 @@ TMP=$(mktemp)
 trap 'rm -f $TMP' EXIT
 config_load jwclient
 
-is_connected() {
+isConnected() {
     local ifname
     config_get ifname userinfo ifname
     local online=$(curl -s --interface $ifname www.baidu.com | grep "!DOCTYPE html")
@@ -23,7 +23,7 @@ start() {
         exit 1
     fi
 
-    if is_connected; then
+    if isConnected; then
         echo "Already connected."
         exit 1
     fi
@@ -53,7 +53,7 @@ start() {
 
     local status=$(cat $TMP | tail -n 1 | grep -Po '(?<=result":").+(?=")')
     if [ "$status" == "success" ]; then
-        echo "Joywise campus network connected successufully."
+        echo "Successfully connected."
         local cookie2=$(cat $TMP | grep "userIndex")
         local userindex=$(echo $cookie2 | grep -Po "(?<=userIndex=\").+(?=\"; Ver)")
         local deviceip=$(echo $userindex | awk -F, '{print $1}')
@@ -80,8 +80,8 @@ stop() {
         exit 1
     fi
 
-    if [ ! is_connected ]; then
-        echo "Not connected."
+    if ! isConnected; then
+        echo "Already disconnected."
         exit 1
     fi
 
