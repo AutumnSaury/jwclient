@@ -20,6 +20,12 @@ start() {
     config_get username userinfo username
     config_get pwd userinfo pwd
 
+    local online=$(curl -s --interface $ifname www.baidu.com | grep "百度一下")
+    if [ -n $online ]; then
+        echo "Already connected."
+        exit 1
+    fi
+
     local redir=$(curl -s --interface $ifname www.baidu.com | grep -Po "http.+(?=</script>)" | sed "s/login/loginForWeb/")
     local cookie1=$(curl -s -I --interface $ifname $redir | grep -Po "(?<=Set-Cookie: ).+")
     local server_path=$(echo $cookie1 | grep -Po "(?<=Path=\/)[^\/]+(?=\/;)")
