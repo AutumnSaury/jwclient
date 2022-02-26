@@ -6,3 +6,8 @@ config userinfo 'userinfo'
     option password ''
 
 config storedconf 'storedconf'
+    option deviceip ''
+    option userip ''
+    option firstrun '1'
+    option server_path ''
+    option server_domain ''
