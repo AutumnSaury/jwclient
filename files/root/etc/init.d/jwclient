@@ -60,6 +60,7 @@ start() {
 
         uci set jwclient.storedconf.deviceip=$(echo $userindex | awk -F, '{print $1}')
         uci set jwclient.storedconf.userip=$(echo $userindex | awk -F, '{print $2}')
+        uci set jwclient.storedconf.lastusername=$username
         uci set jwclient.storedconf.firstrun=0
         uci commit jwclient
         exit 0
@@ -87,11 +88,11 @@ stop() {
     local ifname
     local server_domain
     local server_path
-    local username
+    local lastusername
     local userip
     local deviceip
 
-    config_get username userinfo username
+    config_get lastusername storedconf lastusername
     config_get userip storedconf userip
     config_get deviceip storedconf deviceip
     config_get ifname userinfo ifname
@@ -101,7 +102,7 @@ stop() {
 
     local result=$(curl -s -i --interface $ifname -X POST ${server_domain}/${server_path}/logout \
         -H "Content-Type: application/x-www-form-urlencoded; charset=UTF-8" \
-        --data "userName=${username}&userIp=${userip}&deviceIp=${deviceip}&service.id=&autoLoginFlag=false&userMac=${usermac}&operationType=&isMacFastAuth=false" \
+        --data "userName=${lastusername}&userIp=${userip}&deviceIp=${deviceip}&service.id=&autoLoginFlag=false&userMac=${usermac}&operationType=&isMacFastAuth=false" \
         | grep "已下线")
     if [ -z "$result" ]; then
         echo "Disconnect attempt failed, check your settings and try again."
