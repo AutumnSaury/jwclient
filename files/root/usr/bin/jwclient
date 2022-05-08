@@ -127,11 +127,13 @@ start() {
         exit 1
     fi
 
-    if existLockfile || isConnected 2 3; then
-        echo "Already connected."
+    if existLockfile; then
+        echo "Service is already running."
         exit 1
     fi
-    connect
+    if ! isConnected 2 3; then
+        connect
+    fi
     touch /var/lock/jwclient.lock
     runDaemon
 }
