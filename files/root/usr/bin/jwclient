@@ -127,7 +127,7 @@ start() {
         exit 1
     fi
 
-    if isConnected 2 3; then
+    if existLockfile || isConnected 2 3; then
         echo "Already connected."
         exit 1
     fi
