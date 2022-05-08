@@ -135,6 +135,7 @@ start() {
         connect
     fi
     touch /var/lock/jwclient.lock
+    echo 'Joywise campus net client started'
     runDaemon
 }
 
